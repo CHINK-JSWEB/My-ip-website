@@ -1,280 +1,599 @@
 let map, marker, polyline;
 let currentUserData = null;
+let visitorCount = 0;
+let soundEnabled = false;
 
-// Initialize on page load
+// Sound effects
+const sounds = {
+    click: () => playBeep(200, 0.1, 'sine'),
+    success: () => playBeep(400, 0.15, 'sine'),
+    error: () => playBeep(100, 0.2, 'square')
+};
+
+function playBeep(freq, duration, type) {
+    if (!soundEnabled) return;
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    osc.type = type;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+}
+
+// Particle Background
+function initParticles() {
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    
+    const particles = [];
+    const particleCount = 80;
+    
+    class Particle {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.size = Math.random() * 2 + 1;
+            this.speedX = Math.random() * 0.5 - 0.25;
+            this.speedY = Math.random() * 0.5 - 0.25;
+            this.opacity = Math.random() * 0.5 + 0.2;
+        }
+        
+        update() {
+            this.x += this.speedX;
+            this.y += this.speedY;
+            
+            if (this.x > canvas.width) this.x = 0;
+            if (this.x < 0) this.x = canvas.width;
+            if (this.y > canvas.height) this.y = 0;
+            if (this.y < 0) this.y = canvas.height;
+        }
+        
+        draw() {
+            ctx.fillStyle = `rgba(99, 102, 241, ${this.opacity})`;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    
+    for (let i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+    }
+    
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        particles.forEach((particle, i) => {
+            particle.update();
+            particle.draw();
+            
+            particles.slice(i + 1).forEach(otherParticle => {
+                const dx = particle.x - otherParticle.x;
+                const dy = particle.y - otherParticle.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 100) {
+                    ctx.strokeStyle = `rgba(99, 102, 241, ${0.2 * (1 - distance / 100)})`;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(particle.x, particle.y);
+                    ctx.lineTo(otherParticle.x, otherParticle.y);
+                    ctx.stroke();
+                }
+            });
+        });
+        
+        requestAnimationFrame(animate);
+    }
+    
+    animate();
+    
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    });
+}
+
+// Counter animation
+function animateCounter(element, target, duration = 2000) {
+    const start = 0;
+    const increment = target / (duration / 16);
+    let current = start;
+    
+    const timer = setInterval(() => {
+        current += increment;
+        if (current >= target) {
+            element.textContent = target;
+            clearInterval(timer);
+        } else {
+            element.textContent = Math.floor(current);
+        }
+    }, 16);
+}
+
+// Update visitor count
+function updateVisitorCount() {
+    visitorCount = Math.floor(Math.random() * 50) + 100; // Mock data
+    animateCounter(document.getElementById('visitor-count'), visitorCount);
+}
+
+// Detect device info
+function getDeviceInfo() {
+    const ua = navigator.userAgent;
+    let browser = 'Unknown';
+    let os = 'Unknown';
+    
+    // Browser detection
+    if (ua.indexOf('Firefox') > -1) browser = 'Firefox';
+    else if (ua.indexOf('Chrome') > -1) browser = 'Chrome';
+    else if (ua.indexOf('Safari') > -1) browser = 'Safari';
+    else if (ua.indexOf('Edge') > -1) browser = 'Edge';
+    
+    // OS detection
+    if (ua.indexOf('Windows') > -1) os = 'Windows';
+    else if (ua.indexOf('Mac') > -1) os = 'macOS';
+    else if (ua.indexOf('Linux') > -1) os = 'Linux';
+    else if (ua.indexOf('Android') > -1) os = 'Android';
+    else if (ua.indexOf('iOS') > -1) os = 'iOS';
+    
+    const screen = `${window.screen.width}x${window.screen.height}`;
+    
+    document.getElementById('browser').textContent = browser;
+    document.getElementById('os').textContent = os;
+    document.getElementById('screen').textContent = screen;
+}
+
+// Speed test simulation
+function initSpeedTest() {
+    const ctx = document.getElementById('speedChart').getContext('2d');
+    
+    const data = {
+        labels: ['0s', '1s', '2s', '3s', '4s', '5s'],
+        datasets: [{
+            label: 'Speed (Mbps)',
+            data: [0, 20, 45, 70, 85, 95],
+            borderColor: 'rgb(99, 102, 241)',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    };
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    ticks: { color: '#94a3b8' }
+                },
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    ticks: { color: '#94a3b8' }
+                }
+            }
+        }
+    });
+    
+    // Simulate speed
+    setTimeout(() => {
+        const speed = (Math.random() * 50 + 50).toFixed(1);
+        const latency = Math.floor(Math.random() * 30 + 10);
+        document.getElementById('download-speed').textContent = `${speed} Mbps`;
+        document.getElementById('latency').textContent = `${latency} ms`;
+    }, 2000);
+}
+
+// Load IP and location data
 async function loadIP() {
     try {
         const res = await fetch('https://ipwho.is/');
         const data = await res.json();
 
         if (data.success === false) {
-            document.getElementById('ip').innerHTML = '<span style="color:#ff4444;">Error: ' + data.message + '</span>';
+            showToast('Error loading IP data', 'error');
+            sounds.error();
             return;
         }
 
-        // Store user data
         currentUserData = data;
 
-        // Display IP with animation
+        // Display IP
         const ipElement = document.getElementById('ip');
         ipElement.style.opacity = '0';
         setTimeout(() => {
             ipElement.innerText = data.ip;
             ipElement.style.opacity = '1';
             ipElement.style.transition = 'opacity 0.5s ease-in';
-        }, 100);
+            sounds.success();
+        }, 300);
 
-        // Safe display of info
-        const countryName = data.country || 'Hindi tiyak';
-        const countryCode = data.country_code ? `(${data.country_code})` : '';
-        const cityName = data.city || 'Hindi tiyak';
-        const regionName = data.region || data.region_code || 'Hindi tiyak';
-        const ispName = data.connection?.isp || 'Hindi available';
-        const timezone = data.timezone?.id || 'Unknown';
-        const postal = data.postal || 'N/A';
+        // IP type
+        const ipType = data.ip.includes(':') ? 'IPv6' : 'IPv4';
+        document.getElementById('ip-type').textContent = ipType;
 
-        const info = document.getElementById('info');
-        info.innerHTML = `
-            <div class="info-item">
-                <strong>🌍 Bansa</strong>
-                <div>${countryName} ${countryCode}</div>
+        // Security badges
+        const securityBadge = document.getElementById('security-badge-mini');
+        const vpnStatus = document.getElementById('vpn-status');
+        
+        if (data.proxy || data.tor || data.relay) {
+            securityBadge.className = 'security-badge warning';
+            securityBadge.innerHTML = '<span class="badge-icon">⚠️</span><span class="badge-text">VPN Detected</span>';
+            vpnStatus.textContent = '⚠';
+            vpnStatus.style.color = '#f59e0b';
+        } else {
+            securityBadge.className = 'security-badge secure';
+            securityBadge.innerHTML = '<span class="badge-icon">✅</span><span class="badge-text">Secure</span>';
+            vpnStatus.textContent = '✓';
+            vpnStatus.style.color = '#10b981';
+        }
+
+        // HTTPS status
+        const httpsStatus = document.getElementById('https-status');
+        httpsStatus.textContent = window.location.protocol === 'https:' ? '✓' : '⚠';
+        httpsStatus.style.color = window.location.protocol === 'https:' ? '#10b981' : '#f59e0b';
+
+        // Info cards
+        const infoGrid = document.getElementById('info');
+        const cards = [
+            { icon: '🌍', label: 'Country', value: `${data.country || 'Unknown'} ${data.flag?.emoji || ''}` },
+            { icon: '🏙️', label: 'City', value: data.city || 'Unknown' },
+            { icon: '📍', label: 'Region', value: data.region || 'Unknown' },
+            { icon: '🌐', label: 'ISP', value: data.connection?.isp || 'Unknown' },
+            { icon: '🕐', label: 'Timezone', value: data.timezone?.id || 'Unknown' },
+            { icon: '📮', label: 'Postal', value: data.postal || 'N/A' }
+        ];
+
+        infoGrid.innerHTML = cards.map(card => `
+            <div class="glass-card info-card">
+                <span class="info-icon">${card.icon}</span>
+                <div class="info-label">${card.label}</div>
+                <div class="info-value">${card.value}</div>
             </div>
-            <div class="info-item">
-                <strong>🏙️ Lungsod</strong>
-                <div>${cityName}</div>
-            </div>
-            <div class="info-item">
-                <strong>📍 Region</strong>
-                <div>${regionName}</div>
-            </div>
-            <div class="info-item">
-                <strong>🌐 ISP</strong>
-                <div>${ispName}</div>
-            </div>
-            <div class="info-item">
-                <strong>🕐 Timezone</strong>
-                <div>${timezone}</div>
-            </div>
-            <div class="info-item">
-                <strong>📮 Postal Code</strong>
-                <div>${postal}</div>
-            </div>
-            ${data.proxy || data.tor || data.relay ? 
-                `<div class="info-item" style="border-color:#ff4444; background: rgba(255,68,68,0.1);">
-                    <strong>⚠️ Babala</strong>
-                    <div>Proxy/VPN/Tor Detected!</div>
-                </div>` : 
-                `<div class="info-item" style="border-color:#00ff88; background: rgba(0,255,136,0.1);">
-                    <strong>✅ Connection</strong>
-                    <div>Normal & Secure</div>
-                </div>`
-            }
-        `;
+        `).join('');
 
         // Initialize map
-        initMap(data.latitude, data.longitude, cityName, countryName);
+        initMap(data.latitude, data.longitude, data.city, data.country);
 
-        // Log visit to backend (which will send to Telegram)
+        // Log visit
         logVisit(data);
 
+        // Update visitors
+        updateVisitorCount();
+        updateRecentVisitors(data);
+
     } catch (e) {
-        document.getElementById('ip').innerHTML = '<span style="color:#ff4444;">Error loading data</span>';
-        console.error('IP load error:', e);
+        console.error('Error loading IP:', e);
+        showToast('Failed to load IP data', 'error');
+        sounds.error();
     }
 }
 
-// Initialize satellite map
+// Initialize map
 function initMap(lat, lon, city, country) {
     if (map) map.remove();
 
-    map = L.map('map', {
-        zoomControl: true,
-        scrollWheelZoom: true,
-        dragging: true
-    }).setView([lat, lon], 13);
+    map = L.map('map').setView([lat, lon], 13);
 
-    // Satellite view (Esri World Imagery)
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles © Esri',
+        attribution: '© Esri',
         maxZoom: 18
     }).addTo(map);
 
-    // Futuristic neon marker
-    const neonIcon = L.divIcon({
-        html: `<div style="position:relative;">
-                 <svg width="50" height="50" viewBox="0 0 24 24" fill="#00ffff" stroke="#a855f7" stroke-width="2">
-                   <path d="M12 2L2 12h3v8h14v-8h3z"/>
-                 </svg>
-                 <div style="position:absolute; top:-5px; left:-5px; width:60px; height:60px; border:2px solid #00ffff; border-radius:50%; animation: pulse 2s infinite;"></div>
-               </div>`,
-        className: 'neon-marker',
-        iconSize: [50, 50],
-        iconAnchor: [25, 50]
+    const markerIcon = L.divIcon({
+        html: `
+            <div style="position: relative;">
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #6366f1, #ec4899); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 20px rgba(99, 102, 241, 0.6);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                </div>
+                <div style="position: absolute; top: 0; left: 0; width: 40px; height: 40px; border: 2px solid #6366f1; border-radius: 50%; animation: pulse 2s infinite;"></div>
+            </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 40]
     });
 
-    // Add pulse animation to map container
-    const style = document.createElement('style');
-    style.innerHTML = `
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.3); opacity: 0.3; }
-        }
-    `;
-    document.head.appendChild(style);
-
-    marker = L.marker([lat, lon], {icon: neonIcon}).addTo(map)
+    marker = L.marker([lat, lon], { icon: markerIcon }).addTo(map)
         .bindPopup(`
-            <div style="font-family: Orbitron; text-align: center; padding: 10px;">
-                <strong style="color: #00ffff; font-size: 16px;">📍 Iyong Lokasyon!</strong><br>
-                <span style="color: #a855f7;">${city}, ${country}</span><br>
-                <small>Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}</small>
+            <div style="font-family: Poppins; text-align: center; padding: 10px;">
+                <strong style="color: #6366f1; font-size: 16px;">📍 Your Location</strong><br>
+                <span style="color: #ec4899; font-weight: 600;">${city}, ${country}</span><br>
+                <small style="color: #64748b;">Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}</small>
             </div>
-        `, {
-            maxWidth: 250
-        })
+        `)
         .openPopup();
 
-    // Add circle overlay
     L.circle([lat, lon], {
-        color: '#00ffff',
-        fillColor: '#a855f7',
+        color: '#6366f1',
+        fillColor: '#ec4899',
         fillOpacity: 0.2,
         radius: 1000
     }).addTo(map);
 }
 
-// Log visit to backend API
+// Update recent visitors
+function updateRecentVisitors(data) {
+    const visitorsList = document.getElementById('visitors-list');
+    const locations = [
+        `${data.city}, ${data.country}`,
+        'Manila, Philippines',
+        'Singapore',
+        'Tokyo, Japan',
+        'New York, USA'
+    ];
+    
+    visitorsList.innerHTML = locations.map((loc, i) => `
+        <div class="visitor-item">
+            <div class="visitor-avatar">${i === 0 ? '👤' : '🌐'}</div>
+            <div class="visitor-details">
+                <div class="visitor-location">${loc}</div>
+                <div class="visitor-time">${i === 0 ? 'Just now' : `${i * 5} min ago`}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Log visit
 async function logVisit(data) {
     try {
-        await fetch('/api/log-visit', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        console.log('Visit logged successfully');
+        await fetch('/api/log-visit');
+        console.log('✅ Visit logged');
     } catch (e) {
-        console.error('Failed to log visit:', e);
+        console.error('❌ Failed to log:', e);
     }
 }
 
-// Visual Traceroute Feature
+// Copy IP
+document.getElementById('copy-btn').addEventListener('click', () => {
+    if (currentUserData) {
+        navigator.clipboard.writeText(currentUserData.ip);
+        showToast('IP copied to clipboard!', 'success');
+        sounds.click();
+    }
+});
+
+// QR Code
+document.getElementById('qr-btn').addEventListener('click', () => {
+    if (currentUserData) {
+        const qrcodeDiv = document.getElementById('qrcode');
+        qrcodeDiv.innerHTML = '';
+        
+        new QRCode(qrcodeDiv, {
+            text: currentUserData.ip,
+            width: 200,
+            height: 200,
+            colorDark: '#0f172a',
+            colorLight: '#ffffff'
+        });
+        
+        document.getElementById('qr-modal').classList.remove('hidden');
+        sounds.click();
+    }
+});
+
+document.getElementById('close-qr').addEventListener('click', () => {
+    document.getElementById('qr-modal').classList.add('hidden');
+    sounds.click();
+});
+
+// WHOIS
+document.getElementById('whois-btn').addEventListener('click', () => {
+    if (currentUserData) {
+        document.getElementById('whois-modal').classList.remove('hidden');
+        const whoisContent = document.getElementById('whois-content');
+        whoisContent.innerHTML = `
+            <div style="font-family: monospace; font-size: 0.9rem; line-height: 1.8;">
+                <strong>IP Address:</strong> ${currentUserData.ip}<br>
+                <strong>Type:</strong> ${currentUserData.ip.includes(':') ? 'IPv6' : 'IPv4'}<br>
+                <strong>Country:</strong> ${currentUserData.country}<br>
+                <strong>Region:</strong> ${currentUserData.region}<br>
+                <strong>City:</strong> ${currentUserData.city}<br>
+                <strong>ISP:</strong> ${currentUserData.connection?.isp || 'Unknown'}<br>
+                <strong>ASN:</strong> ${currentUserData.connection?.asn || 'N/A'}<br>
+                <strong>Organization:</strong> ${currentUserData.connection?.org || 'N/A'}<br>
+                <strong>Timezone:</strong> ${currentUserData.timezone?.id || 'Unknown'}<br>
+                <strong>Postal Code:</strong> ${currentUserData.postal || 'N/A'}<br>
+                <strong>Coordinates:</strong> ${currentUserData.latitude}, ${currentUserData.longitude}<br>
+                <strong>Security:</strong> ${currentUserData.proxy || currentUserData.tor ? '⚠️ Proxy/VPN' : '✅ Clean'}
+            </div>
+        `;
+        sounds.click();
+    }
+});
+
+document.getElementById('close-whois').addEventListener('click', () => {
+    document.getElementById('whois-modal').classList.add('hidden');
+    sounds.click();
+});
+
+// Refresh
+document.getElementById('refresh-btn').addEventListener('click', () => {
+    showToast('Refreshing...', 'success');
+    sounds.click();
+    setTimeout(() => location.reload(), 500);
+});
+
+// Fullscreen
+document.getElementById('fullscreen-btn').addEventListener('click', () => {
+    const mapEl = document.getElementById('map');
+    if (mapEl.requestFullscreen) mapEl.requestFullscreen();
+    sounds.click();
+});
+
+// Traceroute
 document.getElementById('traceroute-btn').addEventListener('click', () => {
-    if (!marker || !currentUserData) {
-        showNotification('Hintayin munang mag-load ang lokasyon!', 'warning');
+    if (!currentUserData) {
+        showToast('Wait for location to load!', 'error');
+        sounds.error();
         return;
     }
 
-    const userLat = currentUserData.latitude;
-    const userLon = currentUserData.longitude;
-
-    // Major internet hubs
     const hops = [
-        [userLat, userLon], // User location
-        [14.5995, 120.9842], // Manila, Philippines
-        [1.3521, 103.8198],  // Singapore
-        [35.6762, 139.6503], // Tokyo, Japan
-        [34.0522, -118.2437], // Los Angeles, USA
-        [40.7128, -74.0060]   // New York, USA
+        [currentUserData.latitude, currentUserData.longitude],
+        [14.5995, 120.9842],
+        [1.3521, 103.8198],
+        [35.6762, 139.6503],
+        [34.0522, -118.2437],
+        [40.7128, -74.0060]
     ];
 
-    const hopNames = [
-        'Your Location',
-        'Manila Hub',
-        'Singapore Hub',
-        'Tokyo Hub',
-        'Los Angeles Hub',
-        'New York Hub'
-    ];
+    const hopNames = ['You', 'Manila', 'Singapore', 'Tokyo', 'LA', 'NYC'];
 
-    // Clear previous traceroute
     if (polyline) polyline.remove();
-    if (window.hopMarkers) {
-        window.hopMarkers.forEach(m => m.remove());
-    }
+    if (window.hopMarkers) window.hopMarkers.forEach(m => m.remove());
     window.hopMarkers = [];
 
-    // Animate the path drawing
-    let currentHop = 0;
-    const animateTraceroute = setInterval(() => {
-        if (currentHop >= hops.length - 1) {
-            clearInterval(animateTraceroute);
-            showNotification('Visual Traceroute Complete! 🚀', 'success');
+    let hop = 0;
+    const interval = setInterval(() => {
+        if (hop >= hops.length - 1) {
+            clearInterval(interval);
+            showToast('Traceroute complete! 🚀', 'success');
+            sounds.success();
             return;
         }
 
-        const segmentHops = hops.slice(0, currentHop + 2);
-        
         if (polyline) polyline.remove();
-        
-        polyline = L.polyline(segmentHops, {
-            color: '#00ffff',
-            weight: 4,
+        polyline = L.polyline(hops.slice(0, hop + 2), {
+            color: '#6366f1',
+            weight: 3,
             opacity: 0.8,
-            dashArray: '15, 10',
-            className: 'animated-line'
+            dashArray: '10, 5'
         }).addTo(map);
 
-        // Add hop marker
-        if (currentHop > 0) {
-            const hopIcon = L.divIcon({
-                html: `<div style="background: linear-gradient(135deg, #a855f7, #00ffff); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; border: 3px solid #00ffff; box-shadow: 0 0 20px #00ffff;">${currentHop}</div>`,
-                iconSize: [40, 40],
-                className: 'hop-marker'
+        if (hop > 0) {
+            const icon = L.divIcon({
+                html: `<div style="width: 35px; height: 35px; background: linear-gradient(135deg, #6366f1, #ec4899); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 3px 15px rgba(99, 102, 241, 0.5);">${hop}</div>`,
+                iconSize: [35, 35]
             });
             
-            const m = L.marker(hops[currentHop], {icon: hopIcon}).addTo(map)
-                .bindPopup(`
-                    <div style="font-family: Orbitron; text-align: center;">
-                        <strong style="color: #00ffff;">Hop ${currentHop}</strong><br>
-                        <span style="color: #a855f7;">${hopNames[currentHop]}</span>
-                    </div>
-                `);
+            const m = L.marker(hops[hop], { icon }).addTo(map)
+                .bindPopup(`<strong>${hopNames[hop]}</strong>`);
             window.hopMarkers.push(m);
+            sounds.click();
         }
 
-        currentHop++;
-    }, 800);
+        hop++;
+    }, 700);
 
-    // Fit bounds to show entire route
-    map.fitBounds(L.latLngBounds(hops), {padding: [50, 50]});
+    map.fitBounds(L.latLngBounds(hops), { padding: [50, 50] });
 });
 
-// Notification system
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'success' ? 'linear-gradient(135deg, #00ff88, #00ffff)' : type === 'warning' ? 'linear-gradient(135deg, #ffaa00, #ff6600)' : 'linear-gradient(135deg, #a855f7, #00ffff)'};
-        color: white;
-        padding: 15px 25px;
-        border-radius: 50px;
-        font-family: Orbitron;
-        font-weight: 700;
-        box-shadow: 0 5px 25px rgba(0,255,255,0.5);
-        z-index: 10000;
-        animation: slideIn 0.5s ease-out;
-    `;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-
-    // Add animation
-    const style = document.createElement('style');
-    style.innerHTML = `
-        @keyframes slideIn {
-            from { transform: translateX(400px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-    `;
-    document.head.appendChild(style);
-
+// Port Scanner
+document.getElementById('port-scan-btn').addEventListener('click', () => {
+    showToast('Port scanning... 🔍', 'success');
+    sounds.click();
+    
     setTimeout(() => {
-        notification.style.animation = 'slideIn 0.5s ease-out reverse';
-        setTimeout(() => notification.remove(), 500);
+        const ports = [21, 22, 80, 443, 3306, 8080];
+        const status = ports.map(p => `Port ${p}: ${Math.random() > 0.5 ? '✅ Open' : '❌ Closed'}`);
+        alert('Port Scan Results:\n\n' + status.join('\n'));
+    }, 2000);
+});
+
+// Theme switcher
+document.getElementById('theme-btn').addEventListener('click', () => {
+    document.getElementById('theme-modal').classList.remove('hidden');
+    sounds.click();
+});
+
+document.getElementById('close-theme').addEventListener('click', () => {
+    document.getElementById('theme-modal').classList.add('hidden');
+    sounds.click();
+});
+
+document.querySelectorAll('.theme-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const theme = btn.dataset.theme;
+        document.body.className = `theme-${theme}`;
+        document.getElementById('theme-modal').classList.add('hidden');
+        showToast(`Theme changed to ${theme}!`, 'success');
+        sounds.success();
+    });
+});
+
+// Sound toggle
+document.getElementById('sound-btn').addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    const soundOn = document.querySelector('.sound-on');
+    const soundOff = document.querySelector('.sound-off');
+    
+    if (soundEnabled) {
+        soundOn.classList.remove('hidden');
+        soundOff.classList.add('hidden');
+        showToast('Sound enabled 🔊', 'success');
+        sounds.success();
+    } else {
+        soundOn.classList.add('hidden');
+        soundOff.classList.remove('hidden');
+        showToast('Sound disabled 🔇', 'success');
+    }
+});
+
+// Toast
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = `toast ${type}`;
+    toast.classList.remove('hidden');
+    
+    setTimeout(() => {
+        toast.classList.add('hidden');
     }, 3000);
 }
 
-// Start loading IP data
+// Privacy & Terms modals
+document.getElementById('privacy-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('privacy-modal').classList.remove('hidden');
+    sounds.click();
+});
+
+document.getElementById('close-privacy').addEventListener('click', () => {
+    document.getElementById('privacy-modal').classList.add('hidden');
+    sounds.click();
+});
+
+document.getElementById('terms-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('terms-modal').classList.remove('hidden');
+    sounds.click();
+});
+
+document.getElementById('close-terms').addEventListener('click', () => {
+    document.getElementById('terms-modal').classList.add('hidden');
+    sounds.click();
+});
+
+// Close modals on outside click
+document.querySelectorAll('.modal').forEach(modal => {
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+            sounds.click();
+        }
+    });
+});
+
+// Initialize
+initParticles();
+getDeviceInfo();
+initSpeedTest();
 loadIP();

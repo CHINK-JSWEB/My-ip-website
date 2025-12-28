@@ -4,11 +4,10 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// API endpoint para sa Telegram logging
+// Enhanced Telegram logging with map image
 app.get('/api/log-visit', async (req, res) => {
     const userIP = req.headers['x-forwarded-for']?.split(',')[0].trim() || 
                    req.headers['x-real-ip'] || 
@@ -17,13 +16,12 @@ app.get('/api/log-visit', async (req, res) => {
     
     const userAgent = req.headers['user-agent'] || 'Unknown';
     const referer = req.headers['referer'] || 'Direct';
+    const acceptLang = req.headers['accept-language']?.split(',')[0] || 'Unknown';
 
     try {
-        // Fetch detailed geolocation from ipwho.is
         const geoRes = await fetch(`https://ipwho.is/${userIP}`);
         const geo = await geoRes.json();
 
-        // Format datetime
         const now = new Date();
         const phTime = now.toLocaleString('en-PH', {
             timeZone: 'Asia/Manila',
@@ -36,55 +34,68 @@ app.get('/api/log-visit', async (req, res) => {
             hour12: true
         });
 
-        // Build Telegram message
+        // Detect browser and OS
+        let browser = 'Unknown';
+        let os = 'Unknown';
+        
+        if (userAgent.includes('Firefox')) browser = 'Firefox';
+        else if (userAgent.includes('Chrome')) browser = 'Chrome';
+        else if (userAgent.includes('Safari')) browser = 'Safari';
+        else if (userAgent.includes('Edge')) browser = 'Edge';
+        
+        if (userAgent.includes('Windows')) os = 'Windows';
+        else if (userAgent.includes('Mac')) os = 'macOS';
+        else if (userAgent.includes('Linux')) os = 'Linux';
+        else if (userAgent.includes('Android')) os = 'Android';
+        else if (userAgent.includes('iOS')) os = 'iOS';
+
+        // Build enhanced message
         const message = `
-🌐 *NEW VISITOR - My-IP-Address*
+🚀 *NEW VISITOR ALERT* 🚀
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-━━━━━━━━━━━━━━━━━━━━
-📱 *VISITOR DETAILS*
-━━━━━━━━━━━━━━━━━━━━
+🌐 *IP INFORMATION*
+┣ 🆔 IP: \`${geo.ip || userIP}\`
+┣ 📱 Type: ${geo.ip?.includes(':') ? 'IPv6' : 'IPv4'}
+┗ ${geo.proxy || geo.tor || geo.relay ? '⚠️ *VPN/PROXY DETECTED*' : '✅ *Clean Connection*'}
 
-🆔 *IP Address:* \`${geo.ip || userIP}\`
+📍 *GEOLOCATION*
+┣ 🌍 Country: ${geo.country || 'Unknown'} ${geo.flag?.emoji || '🏳️'}
+┣ 🏙️ City: ${geo.city || 'Unknown'}
+┣ 📍 Region: ${geo.region || 'Unknown'}
+┣ 🎯 Coordinates: \`${geo.latitude}, ${geo.longitude}\`
+┣ 📮 Postal: ${geo.postal || 'N/A'}
+┗ 🕐 Timezone: ${geo.timezone?.id || 'Unknown'}
 
-📍 *LOCATION INFO*
-   • 🏙️ City: ${geo.city || 'Unknown'}
-   • 🗺️ Region: ${geo.region || 'Unknown'}
-   • 🌍 Country: ${geo.country || 'Unknown'} ${geo.country_code ? `(${geo.country_code})` : ''}
-   • 🎯 Coordinates: ${geo.latitude || 'N/A'}, ${geo.longitude || 'N/A'}
-   • 📮 Postal: ${geo.postal || 'N/A'}
-   • 🕐 Timezone: ${geo.timezone?.id || 'Unknown'}
+🌐 *NETWORK DETAILS*
+┣ 🏢 ISP: ${geo.connection?.isp || 'Unknown'}
+┣ 🔢 ASN: ${geo.connection?.asn || 'N/A'}
+┣ 🏛️ Organization: ${geo.connection?.org || 'N/A'}
+┗ 🌐 Domain: ${geo.connection?.domain || 'N/A'}
 
-🌐 *NETWORK INFO*
-   • ISP: ${geo.connection?.isp || 'Unknown'}
-   • ASN: ${geo.connection?.asn || 'N/A'}
-   • Org: ${geo.connection?.org || 'N/A'}
-   • Domain: ${geo.connection?.domain || 'N/A'}
+💻 *DEVICE INFORMATION*
+┣ 🖥️ Browser: ${browser}
+┣ 📱 OS: ${os}
+┣ 🌍 Language: ${acceptLang}
+┗ 🔗 Referer: ${referer.substring(0, 50)}${referer.length > 50 ? '...' : ''}
 
-🖥️ *DEVICE INFO*
-   • Browser: ${userAgent.substring(0, 100)}${userAgent.length > 100 ? '...' : ''}
-   • Referer: ${referer}
+⏰ *VISIT TIME (PH)*
+┗ 🕐 ${phTime}
 
-${geo.flag?.emoji || '🏳️'} *Country Flag:* ${geo.flag?.emoji || ''}
+━━━━━━━━━━━━━━━━━━━━━━━━
+🗺️ [View on Google Maps](https://www.google.com/maps?q=${geo.latitude},${geo.longitude})
+🌐 [IP Lookup](https://ipwho.is/${geo.ip})
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-${geo.proxy || geo.tor || geo.relay ? 
-    '⚠️ *ALERT: Proxy/VPN/Tor Detected!*' : 
-    '✅ *Normal Connection*'}
-
-🕐 *Visit Time (PH):* ${phTime}
-
-━━━━━━━━━━━━━━━━━━━━
-🔗 *View on Map:* [Google Maps](https://www.google.com/maps?q=${geo.latitude},${geo.longitude})
-━━━━━━━━━━━━━━━━━━━━
-
-Powered by My-IP-Address | © 2025 Jonnel Soriano
+⚡ *My-IP-Address Ultimate*
+© 2025 Jonnel Soriano
         `.trim();
 
-        // Your Telegram credentials
         const BOT_TOKEN = process.env.TELEGRAM_TOKEN || '8195403278:AAFK6s8cDdCbJS_9B1DOWrgx09hrAtXaKS4';
         const CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7540290780';
 
-        // Send to Telegram
-        if (BOT_TOKEN && CHAT_ID && BOT_TOKEN !== 'YOUR_BOT_TOKEN_HERE') {
+        if (BOT_TOKEN && CHAT_ID) {
+            // Send text message
             const telegramRes = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -98,10 +109,26 @@ Powered by My-IP-Address | © 2025 Jonnel Soriano
 
             const telegramData = await telegramRes.json();
             
-            if (!telegramData.ok) {
-                console.error('Telegram API Error:', telegramData);
+            if (telegramData.ok) {
+                console.log('✅ Telegram notification sent!');
+                
+                // Try to send location
+                try {
+                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendLocation`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: CHAT_ID,
+                            latitude: parseFloat(geo.latitude),
+                            longitude: parseFloat(geo.longitude)
+                        })
+                    });
+                    console.log('✅ Location sent to Telegram!');
+                } catch (locErr) {
+                    console.log('⚠️ Could not send location:', locErr.message);
+                }
             } else {
-                console.log('✅ Notification sent to Telegram successfully!');
+                console.error('❌ Telegram error:', telegramData);
             }
         }
 
@@ -110,12 +137,14 @@ Powered by My-IP-Address | © 2025 Jonnel Soriano
             message: 'Visit logged',
             data: {
                 ip: geo.ip,
-                location: `${geo.city}, ${geo.country}`
+                location: `${geo.city}, ${geo.country}`,
+                browser,
+                os
             }
         });
 
     } catch (e) {
-        console.error('❌ Error logging visit:', e);
+        console.error('❌ Error:', e);
         res.status(500).json({ 
             status: 'error', 
             message: 'Failed to log visit',
@@ -124,31 +153,35 @@ Powered by My-IP-Address | © 2025 Jonnel Soriano
     }
 });
 
-// Health check endpoint
+// Health check
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
-        service: 'My-IP-Address API',
+        service: 'My-IP-Address Ultimate API',
+        version: '2.0.0',
         timestamp: new Date().toISOString()
     });
 });
 
-// Serve index.html for all other routes
+// Serve index
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Start server
 app.listen(PORT, () => {
     console.log(`
-╔═══════════════════════════════════════╗
-║   🚀 My-IP-Address Server Running    ║
-║                                       ║
-║   Port: ${PORT}                          ║
-║   Status: ✅ Active                   ║
-║   Telegram: ✅ Configured             ║
-║                                       ║
-║   © 2025 Jonnel Soriano              ║
-╚═══════════════════════════════════════╝
+╔═══════════════════════════════════════════════╗
+║                                               ║
+║   🚀 MY-IP-ADDRESS ULTIMATE EDITION 🚀       ║
+║                                               ║
+║   Port: ${PORT}                                  ║
+║   Status: ✅ ONLINE & ACTIVE                  ║
+║   Telegram: ✅ CONFIGURED                     ║
+║   Features: 🎨 ALL-IN                         ║
+║                                               ║
+║   © 2025 Jonnel Soriano                      ║
+║   Version: 2.0.0 Ultimate                    ║
+║                                               ║
+╚═══════════════════════════════════════════════╝
     `);
 });

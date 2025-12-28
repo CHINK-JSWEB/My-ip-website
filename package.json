@@ -1,7 +1,7 @@
 {
-  "name": "my-ip-address",
+  "name": "my-ip-address-ultimate",
   "version": "2.0.0",
-  "description": "My-IP-Address - Futuristic IP lookup with Telegram notifications by Jonnel Soriano",
+  "description": "My-IP-Address Ultimate Edition - Advanced IP tracking with analytics, themes, and Telegram integration by Jonnel Soriano",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,7 +12,11 @@
     "geolocation",
     "telegram-bot",
     "ip-tracker",
-    "network-tools"
+    "network-tools",
+    "analytics",
+    "security",
+    "whois",
+    "traceroute"
   ],
   "author": "Jonnel Soriano",
   "license": "MIT",
