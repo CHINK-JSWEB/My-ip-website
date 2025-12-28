@@ -42,17 +42,17 @@ async function loadIP() {
 }
 
 async function sendToTelegram(data) {
-    const BOT_TOKEN = window.env?.TELEGRAM_TOKEN;
-    const CHAT_ID = window.env?.TELEGRAM_CHAT_ID;
+    // Vercel requires VITE_ prefix for client-side env vars
+    const BOT_TOKEN = import.meta.env?.VITE_TELEGRAM_TOKEN || window.env?.TELEGRAM_TOKEN;
+    const CHAT_ID = import.meta.env?.VITE_TELEGRAM_CHAT_ID || window.env?.TELEGRAM_CHAT_ID;
 
-    // Kung walang env vars (local testing), skip lang – walang error
     if (!BOT_TOKEN || !CHAT_ID) {
-        console.log('Telegram logging skipped (local testing – no env vars)');
+        console.log('Telegram logging skipped (no env vars or local testing)');
         return;
     }
 
     const message = `
-🌐 *Bagong User sa Site!*
+🌐 *Bagong User sa AnoAngIpKo!*
 
 🆔 *IP:* ${data.ip}
 📍 *Lokasyon:* ${data.city || 'Hindi tiyak'}, ${data.region}, \( {data.country} ( \){data.country_code})
@@ -66,7 +66,7 @@ ${data.proxy || data.tor || data.relay ? '⚠️ *Proxy/VPN/Tor Detected!*' : ''
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
 
     try {
-        await fetch(url, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -75,7 +75,12 @@ ${data.proxy || data.tor || data.relay ? '⚠️ *Proxy/VPN/Tor Detected!*' : ''
                 parse_mode: 'Markdown'
             })
         });
-        console.log('Na-send na sa Telegram mo boss!');
+
+        if (response.ok) {
+            console.log('Na-send na sa Telegram mo boss!');
+        } else {
+            console.error('Error sa Telegram API:', await response.text());
+        }
     } catch (e) {
         console.error('Error sending to Telegram:', e);
     }
