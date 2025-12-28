@@ -1,0 +1,12 @@
+{
+  "name": "ano-ang-ip-ko",
+  "version": "1.0.0",
+  "description": "Futuristic WhatIsMyIP tool with Telegram logging",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
