@@ -4,8 +4,103 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Rate limiting store
+const rateLimitStore = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_REQUESTS = 30; // 30 requests per minute
+
+// Security alert store
+const securityAlerts = [];
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
+
+// =========================================
+// RATE LIMITING MIDDLEWARE
+// =========================================
+app.use((req, res, next) => {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || 
+               req.headers['x-real-ip'] || 
+               req.socket.remoteAddress;
+    
+    const now = Date.now();
+    const userRequests = rateLimitStore.get(ip) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
+    
+    // Reset if window expired
+    if (now > userRequests.resetTime) {
+        userRequests.count = 0;
+        userRequests.resetTime = now + RATE_LIMIT_WINDOW;
+    }
+    
+    userRequests.count++;
+    rateLimitStore.set(ip, userRequests);
+    
+    // Block if exceeded
+    if (userRequests.count > MAX_REQUESTS) {
+        console.log(`⚠️ Rate limit exceeded for IP: ${ip}`);
+        return res.status(429).json({
+            error: 'Too many requests',
+            message: 'Please slow down. Rate limit exceeded.',
+            retryAfter: Math.ceil((userRequests.resetTime - now) / 1000)
+        });
+    }
+    
+    next();
+});
+
+// =========================================
+// BOT DETECTION MIDDLEWARE
+// =========================================
+app.use((req, res, next) => {
+    const userAgent = req.headers['user-agent'] || '';
+    const botPatterns = [
+        /bot/i, /crawler/i, /spider/i, /scraper/i,
+        /curl/i, /wget/i, /python-requests/i, /java/i,
+        /headless/i, /phantom/i, /selenium/i, /puppeteer/i
+    ];
+    
+    for (let pattern of botPatterns) {
+        if (pattern.test(userAgent)) {
+            const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+            console.log(`🤖 Bot detected: ${userAgent} from ${ip}`);
+            
+            return res.status(403).json({
+                error: 'Access Denied',
+                message: 'Automated access is not permitted',
+                type: 'bot_detected'
+            });
+        }
+    }
+    
+    next();
+});
+
+// =========================================
+// SECURITY ALERT ENDPOINT
+// =========================================
+app.post('/api/security-alert', (req, res) => {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || 
+               req.headers['x-real-ip'] || 
+               req.socket.remoteAddress;
+    
+    const alert = {
+        ip,
+        reason: req.body.reason,
+        userAgent: req.body.userAgent,
+        fingerprint: req.body.fingerprint,
+        timestamp: req.body.timestamp || new Date().toISOString()
+    };
+    
+    securityAlerts.push(alert);
+    console.log('🚨 Security Alert:', alert);
+    
+    // Keep only last 100 alerts
+    if (securityAlerts.length > 100) {
+        securityAlerts.shift();
+    }
+    
+    res.json({ status: 'logged' });
+});
 
 // Enhanced Telegram logging with map image
 app.get('/api/log-visit', async (req, res) => {
