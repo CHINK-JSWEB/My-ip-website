@@ -54,11 +54,31 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
     const userAgent = req.headers['user-agent'] || '';
     
+    // Block debugging/proxy tools like Reqable, Charles, Fiddler, etc.
+    const debuggingTools = [
+        /reqable/i, /charles/i, /fiddler/i, /burp/i,
+        /mitmproxy/i, /proxyman/i, /whistle/i
+    ];
+    
+    for (let tool of debuggingTools) {
+        if (tool.test(userAgent)) {
+            const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+            console.log(`🚫 Debugging tool blocked: ${userAgent} from ${ip}`);
+            
+            return res.status(403).json({
+                error: 'Access Denied',
+                message: 'HTTP debugging tools are not permitted',
+                type: 'debugging_tool_detected'
+            });
+        }
+    }
+    
     // Only block OBVIOUS bots - allow mobile/in-app browsers
     const strictBotPatterns = [
         /curl/i, /wget/i, /python-requests/i,
         /scrapy/i, /selenium/i, /phantomjs/i,
-        /headless/i, /puppeteer/i, /playwright/i
+        /headless/i, /puppeteer/i, /playwright/i,
+        /postman/i, /insomnia/i, /httpie/i
     ];
     
     for (let pattern of strictBotPatterns) {
@@ -70,6 +90,25 @@ app.use((req, res, next) => {
                 error: 'Access Denied',
                 message: 'Automated access is not permitted',
                 type: 'bot_detected'
+            });
+        }
+    }
+    
+    // Check for suspicious headers (common in debugging tools)
+    const suspiciousHeaders = [
+        'x-reqable-id',
+        'x-charles-proxy',
+        'x-fiddler',
+        'x-proxy-id'
+    ];
+    
+    for (let header of suspiciousHeaders) {
+        if (req.headers[header]) {
+            console.log(`🚫 Suspicious header detected: ${header}`);
+            return res.status(403).json({
+                error: 'Access Denied',
+                message: 'Suspicious request headers detected',
+                type: 'proxy_detected'
             });
         }
     }
@@ -102,6 +141,29 @@ app.post('/api/security-alert', (req, res) => {
     }
     
     res.json({ status: 'logged' });
+});
+
+// =========================================
+// ADVANCED HEADER VALIDATION
+// =========================================
+app.use((req, res, next) => {
+    // Check for missing Accept header (common in tools)
+    if (!req.headers['accept']) {
+        console.log('⚠️ Missing Accept header - possible tool');
+    }
+    
+    // Check for empty referer on non-direct access
+    const path = req.path;
+    if (path !== '/' && path.startsWith('/api/') && !req.headers['referer']) {
+        console.log(`⚠️ API access without referer: ${path}`);
+    }
+    
+    // Check for suspicious Accept-Language (tools often don't set this)
+    if (!req.headers['accept-language']) {
+        console.log('⚠️ Missing Accept-Language header');
+    }
+    
+    next();
 });
 
 // Enhanced Telegram logging with map image
