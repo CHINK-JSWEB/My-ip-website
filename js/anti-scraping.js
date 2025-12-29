@@ -20,27 +20,31 @@
         });
     };
 
-    // Detect DevTools
+    // Detect DevTools (less aggressive)
     const detectDevTools = () => {
-        const threshold = 160;
+        const threshold = 200; // Increased threshold
         const widthThreshold = window.outerWidth - window.innerWidth > threshold;
         const heightThreshold = window.outerHeight - window.innerHeight > threshold;
         
-        if (widthThreshold || heightThreshold) {
+        // Only block if BOTH conditions are true (stricter check)
+        if (widthThreshold && heightThreshold) {
             document.body.innerHTML = `
                 <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: #0f172a; color: #f1f5f9; font-family: 'Poppins', sans-serif; text-align: center; padding: 20px;">
                     <div>
-                        <h1 style="font-size: 3rem; color: #ef4444; margin-bottom: 20px;">⚠️ Access Denied</h1>
-                        <p style="font-size: 1.2rem; color: #cbd5e1;">Developer tools detected. Please close DevTools to continue.</p>
-                        <p style="font-size: 0.9rem; color: #94a3b8; margin-top: 20px;">This site is protected against unauthorized access.</p>
+                        <h1 style="font-size: 3rem; color: #ef4444; margin-bottom: 20px;">⚠️ Developer Tools Detected</h1>
+                        <p style="font-size: 1.2rem; color: #cbd5e1;">Please close DevTools to continue.</p>
+                        <p style="font-size: 0.9rem; color: #94a3b8; margin-top: 20px;">This site is protected against unauthorized inspection.</p>
                     </div>
                 </div>
             `;
         }
     };
 
-    // Check every second
-    setInterval(detectDevTools, 1000);
+    // Check less frequently and only in production
+    if (window.location.hostname !== 'localhost' && 
+        window.location.hostname !== '127.0.0.1') {
+        setInterval(detectDevTools, 3000); // Check every 3 seconds instead of 1
+    }
 
     // =========================================
     // 2. RIGHT-CLICK & COPY PROTECTION
@@ -135,34 +139,29 @@
     // =========================================
     
     const detectBot = () => {
-        const botPatterns = [
-            /bot/i, /crawler/i, /spider/i, /scraper/i,
-            /curl/i, /wget/i, /python/i, /java/i,
-            /headless/i, /phantom/i, /selenium/i
-        ];
-        
         const userAgent = navigator.userAgent;
         
-        for (let pattern of botPatterns) {
+        // Only block OBVIOUS bots (not mobile browsers or in-app browsers)
+        const strictBotPatterns = [
+            /curl/i, /wget/i, /python-requests/i, 
+            /scrapy/i, /selenium/i, /phantomjs/i,
+            /headless/i, /puppeteer/i
+        ];
+        
+        for (let pattern of strictBotPatterns) {
             if (pattern.test(userAgent)) {
-                blockAccess('Bot detected');
+                blockAccess('Automated bot detected');
                 return true;
             }
         }
         
-        // Check for missing browser features
-        if (!navigator.plugins || navigator.plugins.length === 0) {
-            if (!navigator.mimeTypes || navigator.mimeTypes.length === 0) {
-                blockAccess('Suspicious browser detected');
-                return true;
-            }
-        }
-        
-        // Check for automated browsers
-        if (navigator.webdriver) {
+        // Check ONLY for webdriver (clear automation)
+        if (navigator.webdriver === true) {
             blockAccess('Automated browser detected');
             return true;
         }
+        
+        // Don't block based on plugins - mobile browsers don't have them!
         
         return false;
     };
@@ -388,8 +387,10 @@
     // INITIALIZE SECURITY
     // =========================================
     
-    // Disable console in production
-    if (window.location.hostname !== 'localhost') {
+    // Disable console in production (but allow localhost)
+    if (window.location.hostname !== 'localhost' && 
+        window.location.hostname !== '127.0.0.1') {
+        // Only disable console, don't block DevTools completely
         disableConsole();
     }
     

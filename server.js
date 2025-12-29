@@ -53,13 +53,15 @@ app.use((req, res, next) => {
 // =========================================
 app.use((req, res, next) => {
     const userAgent = req.headers['user-agent'] || '';
-    const botPatterns = [
-        /bot/i, /crawler/i, /spider/i, /scraper/i,
-        /curl/i, /wget/i, /python-requests/i, /java/i,
-        /headless/i, /phantom/i, /selenium/i, /puppeteer/i
+    
+    // Only block OBVIOUS bots - allow mobile/in-app browsers
+    const strictBotPatterns = [
+        /curl/i, /wget/i, /python-requests/i,
+        /scrapy/i, /selenium/i, /phantomjs/i,
+        /headless/i, /puppeteer/i, /playwright/i
     ];
     
-    for (let pattern of botPatterns) {
+    for (let pattern of strictBotPatterns) {
         if (pattern.test(userAgent)) {
             const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
             console.log(`🤖 Bot detected: ${userAgent} from ${ip}`);
