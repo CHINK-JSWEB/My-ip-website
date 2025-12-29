@@ -273,6 +273,9 @@ async function loadIP() {
         // Log visit
         logVisit(data);
 
+        // Update IP history
+        updateIPHistory(data);
+
         // Update visitors
         updateVisitorCount();
         updateRecentVisitors(data);
@@ -558,6 +561,102 @@ function showToast(message, type = 'success') {
         toast.classList.add('hidden');
     }, 3000);
 }
+
+// Update IP history
+function updateIPHistory(data) {
+    const historyContainer = document.getElementById('ip-history');
+    document.getElementById('current-ip').textContent = data.ip;
+    document.getElementById('current-location').textContent = `${data.city}, ${data.country}`;
+    
+    // Get stored history from localStorage (if any)
+    let history = [];
+    try {
+        const stored = localStorage.getItem('ip_history');
+        if (stored) history = JSON.parse(stored);
+    } catch (e) {
+        console.log('No history found');
+    }
+    
+    // Add current to history if different
+    const currentEntry = {
+        ip: data.ip,
+        location: `${data.city}, ${data.country}`,
+        time: new Date().toLocaleString()
+    };
+    
+    // Check if IP is different from last entry
+    if (history.length === 0 || history[0].ip !== currentEntry.ip) {
+        history.unshift(currentEntry);
+        history = history.slice(0, 5); // Keep only last 5
+        
+        try {
+            localStorage.setItem('ip_history', JSON.stringify(history));
+        } catch (e) {
+            console.log('Could not save history');
+        }
+    }
+    
+    // Display history
+    if (history.length > 1) {
+        const historyHTML = history.slice(1).map(entry => `
+            <div class="history-item">
+                <div class="history-dot"></div>
+                <div class="history-content">
+                    <div class="history-ip">${entry.ip}</div>
+                    <div class="history-location">${entry.location}</div>
+                    <div class="history-time">${entry.time}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        historyContainer.innerHTML = `
+            <div class="history-item current">
+                <div class="history-dot"></div>
+                <div class="history-content">
+                    <div class="history-ip">${data.ip}</div>
+                    <div class="history-location">${data.city}, ${data.country}</div>
+                    <div class="history-time">Current session</div>
+                </div>
+            </div>
+            ${historyHTML}
+        `;
+    }
+}
+
+// Clear history
+document.getElementById('clear-history-btn').addEventListener('click', () => {
+    try {
+        localStorage.removeItem('ip_history');
+        showToast('History cleared! 🗑️', 'success');
+        sounds.success();
+        
+        // Reset display
+        const historyContainer = document.getElementById('ip-history');
+        if (currentUserData) {
+            historyContainer.innerHTML = `
+                <div class="history-item current">
+                    <div class="history-dot"></div>
+                    <div class="history-content">
+                        <div class="history-ip">${currentUserData.ip}</div>
+                        <div class="history-location">${currentUserData.city}, ${currentUserData.country}</div>
+                        <div class="history-time">Current session</div>
+                    </div>
+                </div>
+                <div class="history-item">
+                    <div class="history-dot"></div>
+                    <div class="history-content">
+                        <div class="history-ip">History cleared</div>
+                        <div class="history-location">Visit again to track changes</div>
+                        <div class="history-time">Your IP changes will appear here</div>
+                    </div>
+                </div>
+            `;
+        }
+    } catch (e) {
+        showToast('Could not clear history', 'error');
+        sounds.error();
+    }
+});
 
 // Privacy & Terms modals
 document.getElementById('privacy-link').addEventListener('click', (e) => {
