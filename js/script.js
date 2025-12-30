@@ -866,16 +866,22 @@ function displayLookupResults(data) {
 function initLookupMap(lat, lon, city, country, ip) {
     const mapContainer = document.getElementById('lookup-map');
     
-    if (lookupMap) {
-        lookupMap.remove();
+    // Remove existing map if any
+    if (window.lookupMap) {
+        try {
+            window.lookupMap.remove();
+        } catch (e) {
+            console.log('Map cleanup:', e);
+        }
     }
     
-    lookupMap = L.map('lookup-map').setView([lat, lon], 10);
+    // Create new map
+    window.lookupMap = L.map('lookup-map').setView([lat, lon], 10);
     
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: '© Esri',
         maxZoom: 18
-    }).addTo(lookupMap);
+    }).addTo(window.lookupMap);
     
     const markerIcon = L.divIcon({
         html: `
@@ -893,7 +899,7 @@ function initLookupMap(lat, lon, city, country, ip) {
         iconAnchor: [20, 40]
     });
     
-    lookupMarker = L.marker([lat, lon], { icon: markerIcon }).addTo(lookupMap)
+    window.lookupMarker = L.marker([lat, lon], { icon: markerIcon }).addTo(window.lookupMap)
         .bindPopup(`
             <div style="font-family: Poppins; text-align: center; padding: 10px;">
                 <strong style="color: #ec4899; font-size: 16px;">📍 Located IP</strong><br>
@@ -909,7 +915,7 @@ function initLookupMap(lat, lon, city, country, ip) {
         fillColor: '#f59e0b',
         fillOpacity: 0.2,
         radius: 2000
-    }).addTo(lookupMap);
+    }).addTo(window.lookupMap);
 }
 
 // Compare with your IP
