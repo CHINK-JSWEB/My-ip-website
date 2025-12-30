@@ -105,6 +105,89 @@ LLfC0GI3bG79qOPwoUXbPp66hVFApGn+DyvmwhBjGJ0fPTgjMGHm7A7+OZRQ0PVrHm77BdGAo+muD0wm
             </div>
         </section>
 
+        <!-- IP Lookup Tool -->
+        <section class="lookup-section">
+            <div class="glass-card lookup-card">
+                <div class="card-glow"></div>
+                <h2 class="section-title">
+                    <svg class="title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    Trace Any IP Address
+                </h2>
+                <p class="section-subtitle">Enter any IP address to get detailed geolocation and network information</p>
+                
+                <div class="lookup-input-wrapper">
+                    <input 
+                        type="text" 
+                        id="ip-lookup-input" 
+                        class="lookup-input" 
+                        placeholder="Enter IP address (e.g., 8.8.8.8)"
+                        pattern="^(\d{1,3}\.){3}\d{1,3}$|^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$"
+                    >
+                    <button class="btn-gradient" id="lookup-btn">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <span>Lookup IP</span>
+                        <div class="btn-shine"></div>
+                    </button>
+                </div>
+
+                <!-- Lookup Results -->
+                <div id="lookup-results" class="lookup-results hidden">
+                    <div class="results-header">
+                        <h3 class="results-title">IP Lookup Results</h3>
+                        <div class="results-actions">
+                            <button class="action-btn" id="compare-btn" title="Compare with your IP">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                                </svg>
+                            </button>
+                            <button class="action-btn" id="export-btn" title="Export results">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                            </button>
+                            <button class="action-btn" id="close-results" title="Close">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="lookup-ip-display">
+                        <span class="lookup-label">IP Address:</span>
+                        <span id="lookup-ip-value" class="lookup-value">---.---.---.---</span>
+                    </div>
+
+                    <div class="lookup-info-grid" id="lookup-info-grid">
+                        <!-- Results will be populated here -->
+                    </div>
+
+                    <!-- Lookup Map -->
+                    <div class="lookup-map-wrapper">
+                        <h4 class="map-title">Location on Map</h4>
+                        <div id="lookup-map"></div>
+                    </div>
+                </div>
+
+                <!-- Search History -->
+                <div class="search-history" id="search-history">
+                    <h4 class="history-header">Recent Searches</h4>
+                    <div class="history-chips" id="history-chips">
+                        <span class="history-chip">No searches yet</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Main IP Display -->
         <section class="ip-section">
             <div class="glass-card main-ip-card">

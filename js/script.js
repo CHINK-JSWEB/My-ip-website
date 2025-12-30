@@ -691,8 +691,278 @@ document.querySelectorAll('.modal').forEach(modal => {
     });
 });
 
+// =========================================
+// IP LOOKUP FEATURE
+// =========================================
+
+// Load search history
+function loadSearchHistory() {
+    try {
+        const stored = localStorage.getItem('ip_search_history');
+        if (stored) {
+            searchHistory = JSON.parse(stored);
+            displaySearchHistory();
+        }
+    } catch (e) {
+        console.log('No search history');
+    }
+}
+
+// Display search history
+function displaySearchHistory() {
+    const container = document.getElementById('history-chips');
+    
+    if (searchHistory.length === 0) {
+        container.innerHTML = '<span class="history-chip">No searches yet</span>';
+        return;
+    }
+    
+    container.innerHTML = searchHistory.map(ip => `
+        <span class="history-chip" onclick="quickLookup('${ip}')">${ip}</span>
+    `).join('');
+}
+
+// Quick lookup from history
+window.quickLookup = function(ip) {
+    document.getElementById('ip-lookup-input').value = ip;
+    document.getElementById('lookup-btn').click();
+    sounds.click();
+};
+
+// Validate IP address
+function isValidIP(ip) {
+    // IPv4 regex
+    const ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
+    // IPv6 regex (simplified)
+    const ipv6 = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+    
+    if (ipv4.test(ip)) {
+        const parts = ip.split('.');
+        return parts.every(part => parseInt(part) >= 0 && parseInt(part) <= 255);
+    }
+    
+    return ipv6.test(ip);
+}
+
+// Perform IP lookup
+document.getElementById('lookup-btn').addEventListener('click', async () => {
+    const input = document.getElementById('ip-lookup-input');
+    const ip = input.value.trim();
+    
+    if (!ip) {
+        showToast('Please enter an IP address', 'error');
+        sounds.error();
+        return;
+    }
+    
+    if (!isValidIP(ip)) {
+        showToast('Invalid IP address format', 'error');
+        sounds.error();
+        return;
+    }
+    
+    // Show loading
+    const resultsDiv = document.getElementById('lookup-results');
+    resultsDiv.classList.remove('hidden');
+    document.getElementById('lookup-ip-value').textContent = 'Loading...';
+    document.getElementById('lookup-info-grid').innerHTML = '<div class="loader"></div>';
+    
+    sounds.click();
+    
+    try {
+        const res = await fetch(`https://ipwho.is/${ip}`);
+        const data = await res.json();
+        
+        if (data.success === false) {
+            showToast(`Error: ${data.message}`, 'error');
+            sounds.error();
+            resultsDiv.classList.add('hidden');
+            return;
+        }
+        
+        // Display results
+        displayLookupResults(data);
+        
+        // Save to history
+        if (!searchHistory.includes(ip)) {
+            searchHistory.unshift(ip);
+            searchHistory = searchHistory.slice(0, 10); // Keep last 10
+            try {
+                localStorage.setItem('ip_search_history', JSON.stringify(searchHistory));
+                displaySearchHistory();
+            } catch (e) {
+                console.log('Could not save history');
+            }
+        }
+        
+        sounds.success();
+        
+    } catch (e) {
+        showToast('Failed to lookup IP address', 'error');
+        sounds.error();
+        console.error('Lookup error:', e);
+        resultsDiv.classList.add('hidden');
+    }
+});
+
+// Display lookup results
+function displayLookupResults(data) {
+    document.getElementById('lookup-ip-value').textContent = data.ip;
+    
+    const infoGrid = document.getElementById('lookup-info-grid');
+    const items = [
+        { label: 'Type', value: data.ip.includes(':') ? 'IPv6' : 'IPv4', icon: '🔢' },
+        { label: 'Country', value: `${data.country || 'Unknown'} ${data.flag?.emoji || ''}`, icon: '🌍' },
+        { label: 'City', value: data.city || 'Unknown', icon: '🏙️' },
+        { label: 'Region', value: data.region || 'Unknown', icon: '📍' },
+        { label: 'ISP', value: data.connection?.isp || 'Unknown', icon: '🌐' },
+        { label: 'ASN', value: data.connection?.asn || 'N/A', icon: '🔢' },
+        { label: 'Timezone', value: data.timezone?.id || 'Unknown', icon: '🕐' },
+        { label: 'Postal', value: data.postal || 'N/A', icon: '📮' },
+        { label: 'Coordinates', value: `${data.latitude?.toFixed(4)}, ${data.longitude?.toFixed(4)}`, icon: '🎯' },
+        { 
+            label: 'Security', 
+            value: data.proxy || data.tor || data.relay ? '⚠️ VPN/Proxy' : '✅ Clean',
+            icon: '🛡️'
+        }
+    ];
+    
+    infoGrid.innerHTML = items.map(item => `
+        <div class="lookup-info-item">
+            <span class="lookup-info-label">${item.icon} ${item.label}</span>
+            <span class="lookup-info-value">${item.value}</span>
+        </div>
+    `).join('');
+    
+    // Initialize lookup map
+    initLookupMap(data.latitude, data.longitude, data.city, data.country, data.ip);
+}
+
+// Initialize lookup map
+function initLookupMap(lat, lon, city, country, ip) {
+    const mapContainer = document.getElementById('lookup-map');
+    
+    if (lookupMap) {
+        lookupMap.remove();
+    }
+    
+    lookupMap = L.map('lookup-map').setView([lat, lon], 10);
+    
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '© Esri',
+        maxZoom: 18
+    }).addTo(lookupMap);
+    
+    const markerIcon = L.divIcon({
+        html: `
+            <div style="position: relative;">
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #ec4899, #f59e0b); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 20px rgba(236, 72, 153, 0.6);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                </div>
+                <div style="position: absolute; top: 0; left: 0; width: 40px; height: 40px; border: 2px solid #ec4899; border-radius: 50%; animation: pulse 2s infinite;"></div>
+            </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 40]
+    });
+    
+    lookupMarker = L.marker([lat, lon], { icon: markerIcon }).addTo(lookupMap)
+        .bindPopup(`
+            <div style="font-family: Poppins; text-align: center; padding: 10px;">
+                <strong style="color: #ec4899; font-size: 16px;">📍 Located IP</strong><br>
+                <span style="color: #6366f1; font-weight: 600; font-family: Orbitron;">${ip}</span><br>
+                <span style="color: #94a3b8;">${city}, ${country}</span><br>
+                <small style="color: #64748b;">Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}</small>
+            </div>
+        `)
+        .openPopup();
+    
+    L.circle([lat, lon], {
+        color: '#ec4899',
+        fillColor: '#f59e0b',
+        fillOpacity: 0.2,
+        radius: 2000
+    }).addTo(lookupMap);
+}
+
+// Compare with your IP
+document.getElementById('compare-btn').addEventListener('click', () => {
+    if (!currentUserData) {
+        showToast('Your IP data not loaded yet', 'error');
+        sounds.error();
+        return;
+    }
+    
+    const lookupIP = document.getElementById('lookup-ip-value').textContent;
+    
+    const comparison = `
+📊 IP COMPARISON
+
+YOUR IP: ${currentUserData.ip}
+Location: ${currentUserData.city}, ${currentUserData.country}
+ISP: ${currentUserData.connection?.isp || 'Unknown'}
+
+SEARCHED IP: ${lookupIP}
+Location: Check results above
+ISP: Check results above
+
+${currentUserData.ip === lookupIP ? '✅ Same IP address!' : '❌ Different IP addresses'}
+    `.trim();
+    
+    alert(comparison);
+    sounds.click();
+});
+
+// Export results
+document.getElementById('export-btn').addEventListener('click', () => {
+    const lookupIP = document.getElementById('lookup-ip-value').textContent;
+    const infoItems = document.querySelectorAll('.lookup-info-item');
+    
+    let exportData = `IP Lookup Results\n`;
+    exportData += `===================\n\n`;
+    exportData += `IP Address: ${lookupIP}\n`;
+    exportData += `Lookup Date: ${new Date().toLocaleString()}\n\n`;
+    
+    infoItems.forEach(item => {
+        const label = item.querySelector('.lookup-info-label').textContent;
+        const value = item.querySelector('.lookup-info-value').textContent;
+        exportData += `${label}: ${value}\n`;
+    });
+    
+    exportData += `\n\n© 2025 My-IP-Address | Jonnel Soriano`;
+    
+    // Create download
+    const blob = new Blob([exportData], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ip-lookup-${lookupIP}-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    showToast('Results exported! 📄', 'success');
+    sounds.success();
+});
+
+// Close results
+document.getElementById('close-results').addEventListener('click', () => {
+    document.getElementById('lookup-results').classList.add('hidden');
+    sounds.click();
+});
+
+// Enter key to search
+document.getElementById('ip-lookup-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        document.getElementById('lookup-btn').click();
+    }
+});
+
 // Initialize
 initParticles();
 getDeviceInfo();
 initSpeedTest();
+loadSearchHistory();
 loadIP();
