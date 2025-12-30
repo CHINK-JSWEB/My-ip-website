@@ -729,19 +729,21 @@ window.quickLookup = function(ip) {
     sounds.click();
 };
 
-// Validate IP address
+// Validate IP address (more lenient for IPv6)
 function isValidIP(ip) {
-    // IPv4 regex
+    // IPv4 regex - strict
     const ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
-    // IPv6 regex (simplified)
-    const ipv6 = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+    
+    // IPv6 regex - more flexible (allows :: notation)
+    const ipv6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/;
     
     if (ipv4.test(ip)) {
         const parts = ip.split('.');
         return parts.every(part => parseInt(part) >= 0 && parseInt(part) <= 255);
     }
     
-    return ipv6.test(ip);
+    // Accept any reasonable IPv6 format
+    return ipv6.test(ip) || ip.includes(':');
 }
 
 // Perform IP lookup
@@ -756,8 +758,9 @@ document.getElementById('lookup-btn').addEventListener('click', async () => {
     }
     
     if (!isValidIP(ip)) {
-        showToast('Invalid IP address format', 'error');
+        showToast('Invalid IP address format. Please check and try again.', 'error');
         sounds.error();
+        console.log('Invalid IP format:', ip);
         return;
     }
     
@@ -769,15 +772,32 @@ document.getElementById('lookup-btn').addEventListener('click', async () => {
     
     sounds.click();
     
+    console.log('🔍 Looking up IP:', ip);
+    
     try {
         const res = await fetch(`https://ipwho.is/${ip}`);
+        
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
         const data = await res.json();
         
+        console.log('📊 API Response:', data);
+        
         if (data.success === false) {
-            showToast(`Error: ${data.message}`, 'error');
+            showToast(`Error: ${data.message || 'Unable to lookup this IP'}`, 'error');
             sounds.error();
             resultsDiv.classList.add('hidden');
+            console.error('API Error:', data);
             return;
+        }
+        
+        // Check if we got valid location data
+        if (!data.latitude || !data.longitude) {
+            showToast('⚠️ IP found but location data incomplete', 'error');
+            sounds.error();
+            console.warn('Incomplete data:', data);
         }
         
         // Display results
@@ -795,13 +815,17 @@ document.getElementById('lookup-btn').addEventListener('click', async () => {
             }
         }
         
+        showToast('✅ IP lookup successful!', 'success');
         sounds.success();
         
     } catch (e) {
-        showToast('Failed to lookup IP address', 'error');
+        showToast(`Failed to lookup IP: ${e.message}`, 'error');
         sounds.error();
         console.error('Lookup error:', e);
         resultsDiv.classList.add('hidden');
+        
+        // Show more helpful error
+        alert(`❌ Lookup Failed\n\nIP: ${ip}\nError: ${e.message}\n\nPossible causes:\n• Invalid IP address\n• API rate limit reached\n• Network connection issue\n• VPN/Proxy blocking API\n\nTry again in a few seconds.`);
     }
 });
 
